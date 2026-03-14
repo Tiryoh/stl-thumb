@@ -36,7 +36,7 @@ jobs:
     - name: Run tests
       run: RUST_BACKTRACE=1 cargo test --verbose
 
-  package-windows:
+  build-windows:
     name: Build (Windows)
     runs-on: windows-latest
     steps:
@@ -53,12 +53,18 @@ jobs:
     - name: Build
       run: cargo build --release --verbose
       # Tests require OpenGL which is not available on GitHub Actions Windows runners
+    - name: Package MSI
+      run: |
+        cargo install cargo-wix --force
+        cargo wix
     - uses: actions/upload-artifact@v4
       with:
         name: windows-x86_64
-        path: target/release/stl-thumb.exe
+        path: |
+          target/release/stl-thumb.exe
+          target/wix/*.msi
 
-  package-ubuntu:
+  build-ubuntu:
     needs: [test]
     name: Package
     runs-on: ubuntu-22.04
