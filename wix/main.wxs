@@ -121,6 +121,14 @@
                                 Source='$(var.CargoTargetBinDir)\stl-thumb.exe'
                                 KeyPath='yes'/>
                         </Component>
+                        <Component Id='library0' Guid='*'>
+                            <File
+                                Id='dll0'
+                                Name='stl_thumb.dll'
+                                DiskId='1'
+                                Source='$(var.CargoTargetBinDir)\stl_thumb.dll'
+                                KeyPath='yes'/>
+                        </Component>
                     </Directory>
                 </Directory>
             </Directory>
@@ -142,6 +150,7 @@
             <ComponentRef Id='License'/>
             
             <ComponentRef Id='binary0'/>
+            <ComponentRef Id='library0'/>
 
             <Feature
                 Id='Environment'
