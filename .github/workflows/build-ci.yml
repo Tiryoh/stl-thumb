@@ -37,6 +37,7 @@ jobs:
       run: RUST_BACKTRACE=1 cargo test --verbose
 
   build-windows:
+    needs: [test]
     name: Build (Windows)
     runs-on: windows-latest
     steps:
