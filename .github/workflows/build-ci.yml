@@ -11,12 +11,12 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  test:
     name: Build and Test
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/cache@v3
+    - uses: actions/checkout@v6
+    - uses: actions/cache@v5
       with:
         path: |
           ~/.cargo/bin/
@@ -36,16 +36,38 @@ jobs:
     - name: Run tests
       run: RUST_BACKTRACE=1 cargo test --verbose
 
-  package:
-    needs: [build]
+  package-windows:
+    name: Build (Windows)
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v6
+    - uses: actions/cache@v5
+      with:
+        path: |
+          ~\.cargo\bin\
+          ~\.cargo\registry\index\
+          ~\.cargo\registry\cache\
+          ~\.cargo\git\db\
+          target\
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    - name: Build
+      run: cargo build --release --verbose
+      # Tests require OpenGL which is not available on GitHub Actions Windows runners
+    - uses: actions/upload-artifact@v4
+      with:
+        name: windows-x86_64
+        path: target/release/stl-thumb.exe
+
+  package-ubuntu:
+    needs: [test]
     name: Package
     runs-on: ubuntu-22.04
     strategy:
       matrix:
         target: [x86_64-unknown-linux-gnu, armv7-unknown-linux-gnueabihf, aarch64-unknown-linux-gnu]
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/cache@v3
+    - uses: actions/checkout@v6
+    - uses: actions/cache@v5
       with:
         path: |
           ~/.cargo/bin/
