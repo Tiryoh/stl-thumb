@@ -2,21 +2,21 @@ name: Build
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
   workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  test:
     name: Build and Test
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/cache@v3
+    - uses: actions/checkout@v6
+    - uses: actions/cache@v5
       with:
         path: |
           ~/.cargo/bin/
@@ -36,16 +36,51 @@ jobs:
     - name: Run tests
       run: RUST_BACKTRACE=1 cargo test --verbose
 
-  package:
-    needs: [build]
+  build-windows:
+    needs: [test]
+    name: Build (Windows)
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v6
+    - uses: actions/cache@v5
+      with:
+        path: |
+          ~\.cargo\bin\
+          ~\.cargo\registry\index\
+          ~\.cargo\registry\cache\
+          ~\.cargo\git\db\
+          target\
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    - name: Set short SHA
+      run: echo "SHORT_SHA=$($env:GITHUB_SHA.Substring(0,7))" >> $env:GITHUB_ENV
+    - name: Build
+      run: cargo build --release --verbose
+      # Tests require OpenGL which is not available on GitHub Actions Windows runners
+    - name: Package MSI
+      run: |
+        cargo install cargo-wix --force
+        cargo wix
+    - uses: actions/upload-artifact@v4
+      with:
+        name: stl-thumb-${{ env.SHORT_SHA }}-windows-x86_64
+        path: |
+          target/release/stl-thumb.exe
+          target/release/stl_thumb.dll
+          target/release/stl_thumb.dll.lib
+          target/release/stl_thumb.lib
+          libstl_thumb.h
+          target/wix/*.msi
+
+  build-ubuntu:
+    needs: [test]
     name: Package
     runs-on: ubuntu-22.04
     strategy:
       matrix:
         target: [x86_64-unknown-linux-gnu, armv7-unknown-linux-gnueabihf, aarch64-unknown-linux-gnu]
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/cache@v3
+    - uses: actions/checkout@v6
+    - uses: actions/cache@v5
       with:
         path: |
           ~/.cargo/bin/
@@ -54,6 +89,8 @@ jobs:
           ~/.cargo/git/db/
           target/
         key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    - name: Set short SHA
+      run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
     - name: Install packages
       # This is all BS to get random dependencies to cross compile and I hate it
       run: |
@@ -66,10 +103,10 @@ jobs:
       run: |
         if [ ${{ matrix.target }} == "armv7-unknown-linux-gnueabihf" ];
         then
-          export PKG_CONFIG_SYSROOT_DIR=/usr/arm-linux-gnueabihf
+          echo "PKG_CONFIG_SYSROOT_DIR=/usr/arm-linux-gnueabihf" >> $GITHUB_ENV
         elif [ ${{ matrix.target }} == "aarch64-unknown-linux-gnu" ];
         then
-          export PKG_CONFIG_SYSROOT_DIR=/usr/aarch64-linux-gnu
+          echo "PKG_CONFIG_SYSROOT_DIR=/usr/aarch64-linux-gnu" >> $GITHUB_ENV
         fi
         rustup target add ${{ matrix.target }}
         cargo install cargo-deb --force
@@ -83,7 +120,7 @@ jobs:
         cargo generate-rpm --target-dir ./target --target ${{ matrix.target }}
     - uses: actions/upload-artifact@v4
       with:
-        name: deb-rpm-${{ matrix.target }}
+        name: stl-thumb-${{ env.SHORT_SHA }}-${{ matrix.target }}
         path: |
           target/${{ matrix.target }}/debian/*.deb
           target/${{ matrix.target }}/generate-rpm/*.rpm
